@@ -1,7 +1,7 @@
 import sys
 from PyQt5.QtWidgets import QApplication
-from interfaz_local import RegistroVentana  # la ventana que definiste
-
+from interfaz_local import RegistroVentana  
+from interfaz_para_usuario import RegistroVentana
 
 url = "http://localhost:80"
 
