@@ -28,6 +28,14 @@ class RegistroVentana(QWidget):
         self.boton_registrar = QPushButton("Registrar")
         self.boton_registrar.clicked.connect(self.registrar_usuario)
 
+        self.boton_qr = QPushButton("Solicitar QR")
+        self.boton_qr.setEnabled(False)
+        self.boton_qr.clicked.connect(self.solicitar_qr)
+
+        self.boton_parqueadero = QPushButton("Solicitar Parqueadero")
+        self.boton_parqueadero.setEnabled(False)
+        self.boton_parqueadero.clicked.connect(self.solicitar_parqueadero)
+
         self.qr_label = QLabel()
         self.qr_label.setFixedSize(250, 250)
         self.qr_label.setAlignment(Qt.AlignCenter)
@@ -43,11 +51,12 @@ class RegistroVentana(QWidget):
         layout.addWidget(self.label_rol)
         layout.addWidget(self.combo_rol)
         layout.addWidget(self.boton_registrar)
+        layout.addWidget(self.boton_qr)
+        layout.addWidget(self.boton_parqueadero)
         layout.addWidget(self.qr_label)
         self.setLayout(layout)
 
     def registrar_usuario(self):
-        self.boton_registrar.setEnabled(False)
         user_id = self.input_id.text()
         password = self.input_password.text()
         program = self.input_programa.text()
@@ -66,33 +75,43 @@ class RegistroVentana(QWidget):
         resultado = parking_client.registerUser(self.url, id_num, password, program, role)
         QMessageBox.information(self, "Resultado", resultado)
 
-        if resultado == "User succesfully registered" or "Usuario ya está registrado":
-            qr_bytes = parking_client.getQR(self.url, id_num, password)
-            if qr_bytes:
-                # Mostrar QR
-                pixmap = QPixmap()
-                pixmap.loadFromData(qr_bytes)
-                pixmap = pixmap.scaled(self.qr_label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                self.qr_label.setPixmap(pixmap)
-
-                # Guardar QR para enviarlo
-                with open("qr.png", "wb") as f:
-                    f.write(qr_bytes)
-
-                # Enviar QR y mostrar puesto asignado
-                puesto = parking_client.sendQR(self.url, "qr.png")
-
-                if isinstance(puesto, bytes):
-                    try:
-                        puesto = puesto.decode('utf-8')
-                    except:
-                            puesto = str(puesto)  # fallback, si falla la decodificación
-                QMessageBox.information(self, "Puesto Asignado", puesto)
-            else:
-                QMessageBox.warning(self, "Error", "No se pudo generar el código QR")
-                self.qr_label.clear()
+        if resultado == "User succesfully registered" or resultado == "Usuario ya está registrado":
+            self.boton_registrar.setEnabled(False)
+            self.boton_qr.setEnabled(True)
+            self.user_id = id_num
+            self.password = password
         else:
-            self.qr_label.clear()
+            self.boton_registrar.setEnabled(True)
+
+    def solicitar_qr(self):
+        qr_bytes = parking_client.getQR(self.url, self.user_id, self.password)
+        if qr_bytes:
+            #Mostrar QR
+            pixmap = QPixmap()
+            pixmap.loadFromData(qr_bytes)
+            pixmap = pixmap.scaled(self.qr_label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.qr_label.setPixmap(pixmap)
+
+            # Guardar QR
+            with open("qr.png", "wb") as f:
+                f.write(qr_bytes)
+
+            self.boton_qr.setEnabled(False)
+            self.boton_parqueadero.setEnabled(True)
+        else:
+            QMessageBox.warning(self, "Error", "No se pudo generar el código QR")
+
+    def solicitar_parqueadero(self):
+        puesto = parking_client.sendQR(self.url, "qr.png")
+
+        if isinstance(puesto, bytes):
+            try:
+                puesto = puesto.decode('utf-8')
+            except:
+                puesto = str(puesto)
+
+        QMessageBox.information(self, "Puesto Asignado", puesto)
+        self.boton_parqueadero.setEnabled(False)
 
 
 if __name__ == "__main__":
