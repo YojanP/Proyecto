@@ -83,8 +83,11 @@ def generateQR(id,program,role,buffer):
 # Si el usuario ya existe deber retornar  "User already registered"
 # Si el usuario no existe debe registar el usuario en la base de datos y retornar  "User succesfully registered"
 
+rolDiferente = None
 
 def registerUser(id, password, program, role):
+
+    global rolDiferente
 
     id_str = str(id)
 
@@ -96,7 +99,8 @@ def registerUser(id, password, program, role):
                     existing_id, _, _, existing_role = parts
                     if existing_id == id_str:
                         if existing_role.lower() != role.lower():
-                            return "Error: El usuario ya está registrado con un rol diferente"
+                            rolDiferente = "Error: El usuario ya está registrado con un rol diferente"
+                            return rolDiferente
                         else:
                             return "Usuario ya está registrado"
 
@@ -115,6 +119,15 @@ def registerUser(id, password, program, role):
 # retorna el código QR si el id y la contraseña son correctos (usuario registrado)
 # Ayuda (debe usar la función generateQR)
 def getQR(id, password):
+
+    global rolDiferente
+
+    if rolDiferente == "Error: El usuario ya está registrado con un rol diferente":
+        return
+    else:
+        print("Usuario registrado correctamente")
+        
+
     buffer = io.BytesIO()
     id_str = str(id)
     
@@ -124,8 +137,12 @@ def getQR(id, password):
                 parts = line.strip().split(',')
                 if len(parts) == 4:
                     existing_id, existing_password, program, role = parts
+                else:
+                    print("Línea mal formateada: ", line)
                     if existing_id == id_str and existing_password == password:
                         generateQR(id, program, role, buffer)
+                    else:
+                        print("Error: ID o contraseña incorrectos")
                         
                         # Guardar el archivo ANTES de retornar
                         with open("qr.png", "wb") as qr_file:
@@ -147,10 +164,11 @@ def identificarSpot(img):
     colores = {
         "Rojo": [(np.array([0, 120, 70]), np.array([10, 255, 255])),
                     (np.array([170, 120, 70]), np.array([180, 255, 255]))],
-        "Azul": [(np.array([100, 150, 70]), np.array([140, 255, 255]))],
+       
+        "Azul":  (np.array([90, 100, 70]), np.array([140, 255, 255])),
+        
         "Amarillo": [(np.array([15, 50, 100]), np.array([35, 255, 255])),  
-                        (np.array([15, 20, 150]), np.array([35, 100, 255]))]   
-
+                        (np.array([15, 20, 150]), np.array([35, 100, 255]))]
     }
     for color, rangos in colores.items():
         mask = sum(cv2.inRange(hsv, rango[0], rango[1]) for rango in rangos)
@@ -160,6 +178,14 @@ def identificarSpot(img):
 
 
 def sendQR(png):
+
+    global rolDiferente
+
+    if rolDiferente == "Error: El usuario ya está registrado con un rol diferente":
+        return
+    else:
+        print("Rol verificado correctamente")
+    
     try:
 
         image = Image.open(io.BytesIO(png))
@@ -167,6 +193,8 @@ def sendQR(png):
 
         if not decoded_list:
             return "Error: No se pudo leer ningún código QR"
+        else:
+            print("QR leído correctamente")
 
         qr_data = decoded_list[0].data.decode('ascii')
         data = loads(qr_data)
@@ -208,20 +236,24 @@ def sendQR(png):
         available_spots = spots_por_rol.get(user_role, [])
         if not available_spots:
             return "Error: Rol no tiene puestos asignados"
+        else:
+            print("Rol con puestos asignados disponibles")
 
 
         # Capturar imagen de cámara
-        cap = cv2.VideoCapture(0)
-        if not cap.isOpened():
-            cap = cv2.VideoCapture(1)
-        if not cap.isOpened():
-            return "Error: No se pudo abrir la cámara para verificar ocupación"
+        cap = cv2.VideoCapture(1)
+        #if not cap.isOpened():
+            #cap = cv2.VideoCapture(0)
+        #if not cap.isOpened():
+            #return "Error: No se pudo abrir la cámara para verificar ocupación"
 
         for i in range(0,30):
             ret, frame = cap.read()
         cap.release()
         if not ret:
             return "Error en la captura de imagen desde la cámara"
+        else:
+            print("Captura de la imagen correcta")
         
         #cv2.imshow("Detección de Parqueaderos", frame)
         cv2.imwrite("s.png",frame)
@@ -240,6 +272,7 @@ def sendQR(png):
             color_detectado = identificarSpot(frame[y:y+h, x:x+w])
             if color_detectado in ["Rojo", "Amarillo", "Azul"]:
                 occupied_spots.add(nombre)
+            
 
         # Asignar primer puesto libre
         for spot in available_spots:
