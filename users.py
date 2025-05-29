@@ -6,6 +6,8 @@
 # pip install pillow
 
 # No modificar estos módulos que se importan
+import cv2
+import numpy as np
 from pyzbar.pyzbar import decode
 from PIL import Image
 from json import dumps
@@ -151,8 +153,21 @@ def getQR(id, password):
 # debe verificar si el QR contiene datos que pueden ser desencriptados con la clave (key), y si el usuario está registrado
 # Debe asignar un puesto de parqueadero dentro de los disponibles.
 
-import cv2
-import numpy as np
+# Función para detectar color en un spot
+def identificarSpot(img):
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    colores = {
+        "Rojo": [(np.array([0, 120, 70]), np.array([10, 255, 255])),
+                    (np.array([170, 120, 70]), np.array([180, 255, 255]))],
+        "Azul": [(np.array([100, 150, 70]), np.array([140, 255, 255]))],
+        "Amarillo": [(np.array([20, 100, 100]), np.array([30, 255, 255]))]
+    }
+    for color, rangos in colores.items():
+        mask = sum(cv2.inRange(hsv, rango[0], rango[1]) for rango in rangos)
+        if np.count_nonzero(mask) > (img.shape[0] * img.shape[1] * 0.3):
+            return color
+    return "Disponible"
+
 
 def sendQR(png):
 
@@ -212,9 +227,9 @@ def sendQR(png):
 
 
         # Capturar imagen de cámara
-        cap = cv2.VideoCapture(1)
+        cap = cv2.VideoCapture(0)
         if not cap.isOpened():
-            cap = cv2.VideoCapture(0)
+            cap = cv2.VideoCapture(1)
         if not cap.isOpened():
             return "Error: No se pudo abrir la cámara para verificar ocupación"
 
@@ -255,19 +270,3 @@ def sendQR(png):
         return "Error: Archivo QR no encontrado"
     except Exception:
         return "Error general al procesar el código QR"
-    
-
-    # Función para detectar color en un spot
-def identificarSpot(img):
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    colores = {
-        "Rojo": [(np.array([0, 120, 70]), np.array([10, 255, 255])),
-                    (np.array([170, 120, 70]), np.array([180, 255, 255]))],
-        "Azul": [(np.array([100, 150, 70]), np.array([140, 255, 255]))],
-        "Amarillo": [(np.array([20, 100, 100]), np.array([30, 255, 255]))]
-    }
-    for color, rangos in colores.items():
-        mask = sum(cv2.inRange(hsv, rango[0], rango[1]) for rango in rangos)
-        if np.count_nonzero(mask) > (img.shape[0] * img.shape[1] * 0.3):
-            return color
-    return "Disponible"
