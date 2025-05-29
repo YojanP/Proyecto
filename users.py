@@ -83,11 +83,8 @@ def generateQR(id,program,role,buffer):
 # Si el usuario ya existe deber retornar  "User already registered"
 # Si el usuario no existe debe registar el usuario en la base de datos y retornar  "User succesfully registered"
 
-rolDiferente = None
 
 def registerUser(id, password, program, role):
-
-    global rolDiferente
 
     id_str = str(id)
 
@@ -99,8 +96,7 @@ def registerUser(id, password, program, role):
                     existing_id, _, _, existing_role = parts
                     if existing_id == id_str:
                         if existing_role.lower() != role.lower():
-                            rolDiferente = "Error: El usuario ya está registrado con un rol diferente"
-                            return rolDiferente
+                            return "Error: El usuario ya está registrado con un rol diferente"
                         else:
                             return "Usuario ya está registrado"
 
@@ -119,14 +115,6 @@ def registerUser(id, password, program, role):
 # retorna el código QR si el id y la contraseña son correctos (usuario registrado)
 # Ayuda (debe usar la función generateQR)
 def getQR(id, password):
-
-    global rolDiferente
-
-    if rolDiferente == "Error: El usuario ya está registrado con un rol diferente":
-        return
-        
-
-
     buffer = io.BytesIO()
     id_str = str(id)
     
@@ -160,7 +148,9 @@ def identificarSpot(img):
         "Rojo": [(np.array([0, 120, 70]), np.array([10, 255, 255])),
                     (np.array([170, 120, 70]), np.array([180, 255, 255]))],
         "Azul": [(np.array([100, 150, 70]), np.array([140, 255, 255]))],
-        "Amarillo": [(np.array([20, 100, 100]), np.array([30, 255, 255]))]
+        "Amarillo": [(np.array([15, 50, 100]), np.array([35, 255, 255])),  
+                        (np.array([15, 20, 150]), np.array([35, 100, 255]))]   
+
     }
     for color, rangos in colores.items():
         mask = sum(cv2.inRange(hsv, rango[0], rango[1]) for rango in rangos)
@@ -170,12 +160,6 @@ def identificarSpot(img):
 
 
 def sendQR(png):
-
-    global rolDiferente
-
-    if rolDiferente == "Error: El usuario ya está registrado con un rol diferente":
-        return
-    
     try:
 
         image = Image.open(io.BytesIO(png))
@@ -254,7 +238,7 @@ def sendQR(png):
         occupied_spots = set()
         for nombre, (x, y, w, h) in parqueaderos.items():
             color_detectado = identificarSpot(frame[y:y+h, x:x+w])
-            if color_detectado == "Rojo":
+            if color_detectado in ["Rojo", "Amarillo", "Azul"]:
                 occupied_spots.add(nombre)
 
         # Asignar primer puesto libre
