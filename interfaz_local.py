@@ -173,8 +173,107 @@ class RegistroVentana(QWidget):
         qt_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format_RGB888)
         self.camera_label.setPixmap(QPixmap.fromImage(qt_image))
 
+class RegistroVentana(QWidget):
+    def __init__(self, url):
+        super().__init__()
+        self.url = url
+        self.setWindowTitle("Registro de Usuario")
+
+        # Elementos de la interfaz
+        self.label_id = QLabel("ID:")
+        self.input_id = QLineEdit()
+
+        self.label_password = QLabel("Contraseña:")
+        self.input_password = QLineEdit()
+        self.input_password.setEchoMode(QLineEdit.Password)
+
+        self.label_programa = QLabel("Programa:")
+        self.input_programa = QLineEdit()
+
+        self.label_rol = QLabel("Rol:")
+        self.combo_rol = QComboBox()
+        self.combo_rol.addItems(["profesor", "estudiante"])
+
+        self.boton_registrar = QPushButton("Registrar")
+        self.boton_registrar.clicked.connect(self.registrar_usuario)
+
+        self.boton_solicitar_qr = QPushButton("Solicitar QR")
+        self.boton_solicitar_qr.setEnabled(False)
+        self.boton_solicitar_qr.clicked.connect(self.solicitar_qr)
+
+        self.boton_solicitar_parqueadero = QPushButton("Solicitar parqueadero")
+        self.boton_solicitar_parqueadero.setEnabled(False)
+        self.boton_solicitar_parqueadero.clicked.connect(self.solicitar_parqueadero)
+
+
+        self.qr_label = QLabel()
+        self.qr_label.setFixedSize(250, 250)
+        self.qr_label.setAlignment(Qt.AlignCenter)
+
+        self.camera_label = QLabel()
+        self.camera_label.setFixedSize(640, 480)
+        self.camera_label.setAlignment(Qt.AlignCenter)
+        self.camera_label.setStyleSheet("background-color: black;")
+
+        self.btn_toggle_camera = QPushButton("Abrir cámara")
+        self.btn_toggle_camera.clicked.connect(self.toggle_camera)
+
+        # Layouts
+        main_layout = QHBoxLayout()
+
+        left_layout = QVBoxLayout()
+        left_layout.addWidget(self.label_id)
+        left_layout.addWidget(self.input_id)
+        left_layout.addWidget(self.label_password)
+        left_layout.addWidget(self.input_password)
+        left_layout.addWidget(self.label_programa)
+        left_layout.addWidget(self.input_programa)
+        left_layout.addWidget(self.label_rol)
+        left_layout.addWidget(self.combo_rol)
+        left_layout.addWidget(self.boton_registrar)
+        left_layout.addWidget(self.boton_solicitar_qr)
+        left_layout.addWidget(self.boton_solicitar_parqueadero)
+        left_layout.addWidget(QLabel("Código QR generado:"))
+        left_layout.addWidget(self.qr_label)
+        left_layout.addWidget(self.btn_toggle_camera)
+        left_layout.addStretch()
+
+        right_layout = QVBoxLayout()
+        right_layout.addWidget(QLabel("Vista en tiempo real de la cámara:"))
+        right_layout.addWidget(self.camera_label)
+        right_layout.addStretch()
+
+        main_layout.addLayout(left_layout)
+        main_layout.addLayout(right_layout)
+
+        self.setLayout(main_layout)
+        self.thread = None
+
+        self.last_user_id = None
+        self.last_user_password = None
+
+    def toggle_camera(self):
+        if self.thread is None:
+            self.thread = CamThread()
+            self.thread.change_pixmap_signal.connect(self.update_image)
+            self.thread.start()
+            self.btn_toggle_camera.setText("Cerrar cámara")
+        else:
+            self.thread.stop()
+            self.thread = None
+            self.camera_label.clear()
+            self.btn_toggle_camera.setText("Abrir cámara")
+
+    def update_image(self, cv_img):
+        rgb_image = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
+        h, w, ch = rgb_image.shape
+        bytes_per_line = ch * w
+        qt_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format_RGB888)
+        self.camera_label.setPixmap(QPixmap.fromImage(qt_image))
+
     def registrar_usuario(self):
         self.boton_registrar.setEnabled(False)
+        self.boton_solicitar_qr.setEnabled(False)
         user_id = self.input_id.text()
         password = self.input_password.text()
         program = self.input_programa.text()
@@ -182,44 +281,68 @@ class RegistroVentana(QWidget):
 
         if not user_id or not password or not program:
             QMessageBox.warning(self, "Error", "Todos los campos son obligatorios")
+            self.boton_registrar.setEnabled(True)
             return
 
         try:
             id_num = int(user_id)
         except ValueError:
             QMessageBox.warning(self, "Error", "El ID debe ser un número")
+            self.boton_registrar.setEnabled(True)
             return
 
         resultado = parking_client.registerUser(self.url, id_num, password, program, role)
         QMessageBox.information(self, "Resultado", resultado)
 
-        if resultado == "User succesfully registered" or "Usuario ya está registrado":
-            qr_bytes = parking_client.getQR(self.url, id_num, password)
-            if qr_bytes:
-                # Mostrar QR
-                pixmap = QPixmap()
-                pixmap.loadFromData(qr_bytes)
-                pixmap = pixmap.scaled(self.qr_label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                self.qr_label.setPixmap(pixmap)
-
-                # Guardar QR para enviarlo
-                with open("qr.png", "wb") as f:
-                    f.write(qr_bytes)
-
-                # Enviar QR y mostrar puesto asignado
-                puesto = parking_client.sendQR(self.url, "qr.png")
-
-                if isinstance(puesto, bytes):
-                    try:
-                        puesto = puesto.decode('utf-8')
-                    except:
-                            puesto = str(puesto)  # fallback, si falla la decodificación
-                QMessageBox.information(self, "Puesto Asignado", puesto)
-            else:
-                QMessageBox.warning(self, "Error", "No se pudo generar el código QR")
-                self.qr_label.clear()
+        if resultado == "User succesfully registered" or resultado == "Usuario ya está registrado":
+            self.boton_solicitar_qr.setEnabled(True)
+            self.boton_registrar.setEnabled(False)
+            self.last_user_id = id_num
+            self.last_user_password = password
         else:
+            self.boton_registrar.setEnabled(True)
+
+
+    def solicitar_qr(self):
+        if not hasattr(self, "last_user_id") or not hasattr(self, "last_user_password"):
+            QMessageBox.warning(self, "Error", "No hay credenciales almacenadas para solicitar el QR")
+            return
+
+        qr_bytes = parking_client.getQR(self.url, self.last_user_id, self.last_user_password)
+        if qr_bytes:
+            pixmap = QPixmap()
+            pixmap.loadFromData(qr_bytes)
+            pixmap = pixmap.scaled(self.qr_label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.qr_label.setPixmap(pixmap)
+
+            # Guardar QR como archivo
+            with open("qr.png", "wb") as f:
+                f.write(qr_bytes)
+
+            # Deshabilitar botón de solicitar QR y habilitar el de parqueadero
+            self.boton_solicitar_qr.setEnabled(False)
+            self.boton_solicitar_parqueadero.setEnabled(True)
+
+
+        else:
+            QMessageBox.warning(self, "Error", "No se pudo generar el código QR")
             self.qr_label.clear()
+            self.boton_solicitar_parqueadero.setEnabled(False)
+
+    def solicitar_parqueadero(self):
+        try:
+            puesto = parking_client.sendQR(self.url, "qr.png")
+            if isinstance(puesto, bytes):
+                try:
+                    puesto = puesto.decode('utf-8')
+                except:
+                    puesto = str(puesto)
+            QMessageBox.information(self, "Puesto Asignado", puesto)
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"No se pudo asignar el puesto: {str(e)}")
+
+
+    
 
     def closeEvent(self, event):
         if self.thread is not None:
@@ -235,6 +358,10 @@ if __name__ == "__main__":
     sys.exit(app.exec_())
 
 
+
+
+
+    
 
 
 
