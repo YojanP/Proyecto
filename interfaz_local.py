@@ -12,8 +12,9 @@ def identificarSpot(img):
     colores = {
         "Rojo": [(np.array([0, 120, 70]), np.array([10, 255, 255])),
                  (np.array([170, 120, 70]), np.array([180, 255, 255]))],
-        "Azul": [(np.array([100, 150, 70]), np.array([140, 255, 255]))],
-        "Amarillo": [(np.array([20, 100, 100]), np.array([30, 255, 255]))]
+        "Azul": [(np.array([90, 100, 70]), np.array([140, 255, 255])) ],
+        "Amarillo": [(np.array([15, 50, 100]), np.array([35, 255, 255])),  
+                        (np.array([15, 20, 150]), np.array([35, 100, 255]))]
     }
     for color, rangos in colores.items():
         mask = sum(cv2.inRange(hsv, rango[0], rango[1]) for rango in rangos)
@@ -39,9 +40,9 @@ class CamThread(QThread):
         self._run_flag = True
 
     def run(self):
-        cap = cv2.VideoCapture(0)
+        cap = cv2.VideoCapture(1)
         if not cap.isOpened():
-            cap = cv2.VideoCapture(1)
+            cap = cv2.VideoCapture(0)
         if not cap.isOpened():
             self._run_flag = False
             return
@@ -342,8 +343,6 @@ class RegistroVentana(QWidget):
             QMessageBox.warning(self, "Error", f"No se pudo asignar el puesto: {str(e)}")
 
 
-    
-
     def closeEvent(self, event):
         if self.thread is not None:
             self.thread.stop()
@@ -356,7 +355,6 @@ if __name__ == "__main__":
     ventana = RegistroVentana(url)
     ventana.show()
     sys.exit(app.exec_())
-
 
 
 
